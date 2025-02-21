@@ -1,0 +1,17 @@
+{
+  "skill_level": 100,
+  "guzzling_pouch": true,
+  "guzzling_pouch_level": 5,
+  "enhancer_level": 10,
+  "enhancer_type": "holy",
+  "laboratory_level": 4,
+  "tea": {
+    "enhancing tea": false,
+    "super enhancing tea": false,
+    "ultra enhancing tea": true,
+    "blessed tea": true
+  },
+  "recommended_level": 70,
+  "target_level": 10,
+  "enhance_times": 10000
+}

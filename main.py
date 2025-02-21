@@ -9,36 +9,7 @@ plt.rcParams['font.sans-serif'] = ['SimHei']
 plt.rcParams['axes.unicode_minus'] = False
 
 
-def get_drink_concentration():
-    if not guzzling_pouch:
-        return 1.0
-    return 1 + 0.1 * (1 + BONUS[guzzling_pouch_level])
-
-
-def get_player_level():
-    return base_player_level + get_drink_concentration() * (
-            (3 if tea['enhancing tea'] else 0) +
-            (6 if tea['super enhancing tea'] else 0) +
-            (8 if tea['ultra enhancing tea'] else 0)
-    )
-
-
-def enhance_success_rate_mod(item_recommended_level: int):
-    player_level = get_player_level()
-    level_rate = ((player_level - item_recommended_level) * 0.0005) \
-        if (player_level >= item_recommended_level) \
-        else (-0.5 * (1 - player_level / item_recommended_level))
-    enhancer_buff = TOOLS_LEVEL[enhancer_type] * (1 + BONUS[enhancer_level])
-    enhancer_buff = round(enhancer_buff, 4)  # doh-nuts website has this rounding, and I don't know why
-    buff = 0.0005 * laboratory_level + enhancer_buff
-    return level_rate + buff
-
-
-def enhance_success_rate(item_recommended_level: int, item_level: int):
-    return BASE_SUCCESS_RATE[item_level] * (1 + enhance_success_rate_mod(item_recommended_level))
-
-
-def expectation(protection_level: int):
+def expectation(protect_level: int, st: Setting):
     """
     Math theorem:
     Let n = target level
@@ -51,90 +22,72 @@ def expectation(protection_level: int):
     Trivial to consider protection or blessed tea
     :return expect of enhance times when you have a +0 item
     """
-    matrix = np.zeros((target_level + 1, target_level + 1))
-    blessed_rate = 0.01 * get_drink_concentration() if tea['blessed tea'] else 0.0
-    for now_level in range(target_level + 1):
-        success_rate = enhance_success_rate(recommended_level, now_level)
-        if now_level == target_level:
-            matrix[now_level][now_level] = 1.0
+    coefficient = np.zeros((st.target_level + 1, st.target_level + 1))
+    for now_level in range(st.target_level + 1):
+        success_rate = st.enhance_success_rate(now_level)
+        if now_level == st.target_level:
+            coefficient[now_level][now_level] = 1.0
             continue
-        matrix[now_level][now_level] = 1.0
-        if now_level < protection_level:
-            matrix[now_level][0] += success_rate - 1
+        coefficient[now_level][now_level] = 1.0
+        if now_level < protect_level:
+            coefficient[now_level][0] += success_rate - 1
         else:
-            matrix[now_level][now_level - 1] = success_rate - 1
-        if now_level + 1 < target_level:
-            matrix[now_level][now_level + 1] = -success_rate * (1 - blessed_rate)
-            matrix[now_level][now_level + 2] = -success_rate * blessed_rate
+            coefficient[now_level][now_level - 1] = success_rate - 1
+        if now_level + 1 < st.target_level:
+            coefficient[now_level][now_level + 1] = -success_rate * (1 - st.blessed_rate)
+            coefficient[now_level][now_level + 2] = -success_rate * st.blessed_rate
         else:
-            matrix[now_level][now_level + 1] = -success_rate
-    return np.linalg.solve(matrix, np.ones(target_level + 1))[0]
+            coefficient[now_level][now_level + 1] = -success_rate
+    return np.linalg.solve(coefficient, np.ones(st.target_level + 1))[0]
 
 
-def stochastic_matrix(protection_level: int):
+def stochastic_matrix(protect_level: int, st: Setting):
     """
-    matrix[i][j] = when you have a +i item, matrix[i][j] possibility to get a +j item after one action
+    result[i][j] = when you have a +i item, result[i][j] possibility to get a +j item after one action
     """
-    matrix = np.zeros((target_level + 1, target_level + 1))
-    blessed_rate = 0.01 * get_drink_concentration() if tea['blessed tea'] else 0.0
-    for now_level in range(target_level + 1):
-        if now_level == target_level:
-            matrix[now_level][now_level] = 1.0
+    result = np.zeros((st.target_level + 1, st.target_level + 1))
+    for now_level in range(st.target_level + 1):
+        success_rate = st.enhance_success_rate(now_level)
+        if now_level == st.target_level:
+            result[now_level][now_level] = 1.0
             continue
-        success_rate = enhance_success_rate(recommended_level, now_level)
         # success
-        if now_level + 1 < target_level:
-            matrix[now_level][now_level + 1] = success_rate * (1 - blessed_rate)
-            matrix[now_level][now_level + 2] = success_rate * blessed_rate
+        if now_level + 1 < st.target_level:
+            result[now_level][now_level + 1] = success_rate * (1 - st.blessed_rate)
+            result[now_level][now_level + 2] = success_rate * st.blessed_rate
         else:
-            matrix[now_level][now_level + 1] = success_rate
+            result[now_level][now_level + 1] = success_rate
         # fail
-        if now_level < protection_level:
-            matrix[now_level][0] = 1 - success_rate
+        if now_level < protect_level:
+            result[now_level][0] = 1 - success_rate
         else:
-            matrix[now_level][now_level - 1] = 1 - success_rate
-    return matrix
+            result[now_level][now_level - 1] = 1 - success_rate
+    return result
 
 
-def reach_target_probability(protection_level: int, work_times: int):
-    return np.linalg.matrix_power(stochastic_matrix(protection_level), work_times)[0][target_level]
 
 
 if __name__ == '__main__':
+    st = Setting()
     plt.figure(figsize=(8, 4.5), dpi=100)
 
-    start = np.zeros(target_level + 1)
+    start = np.zeros(st.target_level + 1)
     start[0] = 1.0
-    for protection_level in range(2, target_level + 1):
-        stochastic = stochastic_matrix(protection_level)
+    for protect_level in range(2, st.target_level + 1):
+        stochastic = stochastic_matrix(protect_level, st)
         # print(np.linalg.cond(stochastic))
         matrix = stochastic.copy()
-        win_rate = np.zeros(work_times)
-        for i in range(work_times):
+        win_rate = np.zeros(st.enhance_times)
+        for i in range(st.enhance_times):
             # win_rate[k] = x A^k = (0, 0, 0, ..., 0, 0, 1) (stochastic)^k = sum of last column of (stochastic)^k
             matrix @= stochastic
-            win_rate[i] = np.sum(matrix[:, target_level])
-        # plt.plot(range(1, work_times + 1), win_rate,
-        #          label=f'{protection_level}级保护' if protection_level < target_level else '不保护')
-        # plt.text(0.5, 1.1, ha='center', va='center', transform=plt.gca().transAxes, fontsize=8,
-        #          s=f'{base_player_level}级强化  +{enhancer_level} {enhancer_type}强化器  '
-        #            f'{f"+{guzzling_pouch_level}暴饮之囊" if guzzling_pouch else ""}  {laboratory_level}级天文台  '
-        #            f'茶={list(filter(lambda key: tea[key], tea.keys()))}\n'
-        #            f'物品推荐等级={recommended_level}  目标强化等级={target_level}\n'
-        #            f'图中曲线上高亮点表示期望强化次数', )
-        plt.plot(range(1, work_times + 1), win_rate,
-                 label=f'{protection_level} protect level' if protection_level < target_level else 'no protection')
-        plt.text(0.5, 1.1, ha='center', va='center', transform=plt.gca().transAxes, fontsize=8,
-                 s=f'{base_player_level} skill level | +{enhancer_level} {enhancer_type} enhancer | '
-                   f'{"+" + str(guzzling_pouch_level) if guzzling_pouch else "No"} guzzling pouch | '
-                   f'{laboratory_level} observatory level | tea={list(filter(lambda key: tea[key], tea.keys()))}\n'
-                   f'item recommended level={recommended_level} | target level={target_level}\n'
-                   f'points on the curve represent expected values', )
-        expect = expectation(protection_level)
+            win_rate[i] = np.sum(matrix[:, st.target_level])
+        plt.plot(range(1, st.enhance_times + 1), win_rate,
+                 label=f'{protect_level}级保护' if protect_level < st.target_level else '不保护')
+        plt.text(0.5, 1.1, ha='center', va='center', transform=plt.gca().transAxes, fontsize=8,s='')
+        expect = expectation(protect_level,st)
         plt.scatter(expect, win_rate[int(expect)])
-    # plt.xlabel('强化次数')
-    # plt.ylabel('成功率')
-    plt.xlabel('actions')
-    plt.ylabel('win rate')
+    plt.xlabel('强化次数')
+    plt.ylabel('成功率')
     plt.legend()
     plt.show()
