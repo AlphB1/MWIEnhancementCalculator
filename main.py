@@ -96,20 +96,18 @@ def stochastic_matrix(protection_level: int):
 
 
 if __name__ == '__main__':
-    plt.figure(figsize=(8, 4.5), dpi=200)
+    plt.figure(figsize=(8, 4.5), dpi=100)
 
     start = np.zeros(target_level + 1)
     start[0] = 1.0
     for protection_level in range(2, target_level + 1):
-        matrix = stochastic_matrix(protection_level)
-        distribution = start.copy()
+        stochastic = stochastic_matrix(protection_level)
+        matrix = stochastic.copy()
         win_rate = np.zeros(work_times)
-        expect = solve(protection_level)
         for i in range(work_times):
-            # Let distribution = (target_level + 1)-dim vector
-            # distribution[k] = possibility of having +k item after {i} actions
-            distribution @= matrix
-            win_rate[i] = distribution[target_level]
+            # win_rate[k] = x A^k = (0, 0, 0, ..., 0, 0, 1) (stochastic)^k = sum of last column of (stochastic)^k
+            matrix @= stochastic
+            win_rate[i] = np.sum(matrix[:, target_level])
         # plt.plot(range(1, work_times + 1), win_rate,
         #          label=f'{protection_level}级保护' if protection_level < target_level else '不保护')
         # plt.text(0.5, 1.1, ha='center', va='center', transform=plt.gca().transAxes, fontsize=8,
@@ -126,6 +124,7 @@ if __name__ == '__main__':
                    f'{laboratory_level} observatory level | tea={list(filter(lambda key: tea[key], tea.keys()))}\n'
                    f'item recommended level={recommended_level} | target level={target_level}\n'
                    f'points on the curve represent expected values', )
+        expect = solve(protection_level)
         plt.scatter(expect, win_rate[int(expect)])
     # plt.xlabel('强化次数')
     # plt.ylabel('成功率')
