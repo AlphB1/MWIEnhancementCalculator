@@ -4,6 +4,7 @@ from matplotlib import pyplot as plt
 from constant import *
 from settings import *
 
+# np.set_printoptions(linewidth=1000, precision=4, suppress=True)
 plt.rcParams['font.sans-serif'] = ['SimHei']
 plt.rcParams['axes.unicode_minus'] = False
 
@@ -22,7 +23,7 @@ def get_player_level():
     )
 
 
-def get_success_rate_mod(item_recommended_level: int):
+def enhance_success_rate_mod(item_recommended_level: int):
     player_level = get_player_level()
     level_rate = ((player_level - item_recommended_level) * 0.0005) \
         if (player_level >= item_recommended_level) \
@@ -33,11 +34,11 @@ def get_success_rate_mod(item_recommended_level: int):
     return level_rate + buff
 
 
-def get_success_rate(item_recommended_level: int, item_level: int):
-    return BASE_SUCCESS_RATE[item_level] * (1 + get_success_rate_mod(item_recommended_level))
+def enhance_success_rate(item_recommended_level: int, item_level: int):
+    return BASE_SUCCESS_RATE[item_level] * (1 + enhance_success_rate_mod(item_recommended_level))
 
 
-def solve(protection_level: int):
+def expectation(protection_level: int):
     """
     Math theorem:
     Let n = target level
@@ -53,7 +54,7 @@ def solve(protection_level: int):
     matrix = np.zeros((target_level + 1, target_level + 1))
     blessed_rate = 0.01 * get_drink_concentration() if tea['blessed tea'] else 0.0
     for now_level in range(target_level + 1):
-        success_rate = get_success_rate(recommended_level, now_level)
+        success_rate = enhance_success_rate(recommended_level, now_level)
         if now_level == target_level:
             matrix[now_level][now_level] = 1.0
             continue
@@ -80,7 +81,7 @@ def stochastic_matrix(protection_level: int):
         if now_level == target_level:
             matrix[now_level][now_level] = 1.0
             continue
-        success_rate = get_success_rate(recommended_level, now_level)
+        success_rate = enhance_success_rate(recommended_level, now_level)
         # success
         if now_level + 1 < target_level:
             matrix[now_level][now_level + 1] = success_rate * (1 - blessed_rate)
@@ -95,6 +96,10 @@ def stochastic_matrix(protection_level: int):
     return matrix
 
 
+def reach_target_probability(protection_level: int, work_times: int):
+    return np.linalg.matrix_power(stochastic_matrix(protection_level), work_times)[0][target_level]
+
+
 if __name__ == '__main__':
     plt.figure(figsize=(8, 4.5), dpi=100)
 
@@ -102,6 +107,7 @@ if __name__ == '__main__':
     start[0] = 1.0
     for protection_level in range(2, target_level + 1):
         stochastic = stochastic_matrix(protection_level)
+        # print(np.linalg.cond(stochastic))
         matrix = stochastic.copy()
         win_rate = np.zeros(work_times)
         for i in range(work_times):
@@ -124,7 +130,7 @@ if __name__ == '__main__':
                    f'{laboratory_level} observatory level | tea={list(filter(lambda key: tea[key], tea.keys()))}\n'
                    f'item recommended level={recommended_level} | target level={target_level}\n'
                    f'points on the curve represent expected values', )
-        expect = solve(protection_level)
+        expect = expectation(protection_level)
         plt.scatter(expect, win_rate[int(expect)])
     # plt.xlabel('强化次数')
     # plt.ylabel('成功率')
