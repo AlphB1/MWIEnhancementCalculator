@@ -1,10 +1,9 @@
 import numpy as np
 from matplotlib import pyplot as plt
 
-from constant import *
 from settings import *
 
-# np.set_printoptions(linewidth=1000, precision=4, suppress=True)
+np.set_printoptions(linewidth=1000, precision=5, suppress=True)
 plt.rcParams['font.sans-serif'] = ['SimHei']
 plt.rcParams['axes.unicode_minus'] = False
 
@@ -65,29 +64,71 @@ def stochastic_matrix(protect_level: int, st: Setting):
     return result
 
 
+def get_distribution(protect_level: int, protect_times: int, st: Setting,tolerance = 1e-6):
+    """
+    Let distribution = protection_level × (protect_times+1) matrix
+    After k actions, distribution[i][j] = possibility of owning +i item and having used j protection
+    """
+    if protect_times == np.inf:
+        return np.linalg.matrix_power(stochastic_matrix(protect_level, st), st.enhance_times)[0][st.target_level]
+    assert 2 <= protect_level <= st.target_level
+    no_protect_matrix = np.zeros((st.target_level + 1, st.target_level + 1))
+    protect_vector = np.zeros(st.target_level - protect_level)
+    for now_level in range(st.target_level + 1):
+        if now_level == st.target_level:
+            no_protect_matrix[now_level][now_level] = 1.0
+            continue
+        success_rate = st.enhance_success_rate(now_level)
+        # success
+        if now_level + 1 < st.target_level:
+            no_protect_matrix[now_level][now_level + 1] = success_rate * (1 - st.blessed_rate)
+            no_protect_matrix[now_level][now_level + 2] = success_rate * st.blessed_rate
+        else:
+            no_protect_matrix[now_level][now_level + 1] = success_rate
+        # fail
+        if now_level < protect_level:
+            no_protect_matrix[now_level][0] = 1 - success_rate
+        else:
+            protect_vector[now_level - protect_level] = 1 - success_rate
+    distribution = np.zeros((protect_times + 1, st.target_level + 1))
+    distribution[0][0] = 1.0
+    print(distribution)
+    for _ in range(st.enhance_times):
+        next = np.vstack((distribution[:-1, ] @ no_protect_matrix, distribution[-1]))
+        protect_slice = distribution[:-1, protect_level:st.target_level]
+        fail_matrix = protect_slice * protect_vector
+        next[1:, protect_level - 1:st.target_level - 1] += fail_matrix
+        distribution = next
+        assert abs(1 - np.sum(distribution)) < tolerance
+    return distribution
 
 
 if __name__ == '__main__':
     st = Setting()
-    plt.figure(figsize=(8, 4.5), dpi=100)
+    dis = get_distribution(7, 16, st)
+    print('probability of accomplishing target =',np.sum(dis[:, -1]))
+    print('probability of consuming all enhancing material =',np.sum(dis[:-1,:-1]))
+    print('probability of consuming all protect material =',np.sum(dis[-1,:]))
 
-    start = np.zeros(st.target_level + 1)
-    start[0] = 1.0
-    for protect_level in range(2, st.target_level + 1):
-        stochastic = stochastic_matrix(protect_level, st)
-        # print(np.linalg.cond(stochastic))
-        matrix = stochastic.copy()
-        win_rate = np.zeros(st.enhance_times)
-        for i in range(st.enhance_times):
-            # win_rate[k] = x A^k = (0, 0, 0, ..., 0, 0, 1) (stochastic)^k = sum of last column of (stochastic)^k
-            matrix @= stochastic
-            win_rate[i] = np.sum(matrix[:, st.target_level])
-        plt.plot(range(1, st.enhance_times + 1), win_rate,
-                 label=f'{protect_level}级保护' if protect_level < st.target_level else '不保护')
-        plt.text(0.5, 1.1, ha='center', va='center', transform=plt.gca().transAxes, fontsize=8,s='')
-        expect = expectation(protect_level,st)
-        plt.scatter(expect, win_rate[int(expect)])
-    plt.xlabel('强化次数')
-    plt.ylabel('成功率')
-    plt.legend()
-    plt.show()
+    # plt.figure(figsize=(8, 4.5), dpi=100)
+    #
+    # start = np.zeros(st.target_level + 1)
+    # start[0] = 1.0
+    # for protect_level in range(2, st.target_level + 1):
+    #     stochastic = stochastic_matrix(protect_level, st)
+    #     # print(np.linalg.cond(stochastic))
+    #     matrix = stochastic.copy()
+    #     win_rate = np.zeros(st.enhance_times)
+    #     for i in range(st.enhance_times):
+    #         # win_rate[k] = x A^k = (0, 0, 0, ..., 0, 0, 1) (stochastic)^k = sum of last column of (stochastic)^k
+    #         matrix @= stochastic
+    #         win_rate[i] = np.sum(matrix[:, st.target_level])
+    #     plt.plot(range(1, st.enhance_times + 1), win_rate,
+    #              label=f'{protect_level}级保护' if protect_level < st.target_level else '不保护')
+    #     plt.text(0.5, 1.1, ha='center', va='center', transform=plt.gca().transAxes, fontsize=8, s='')
+    #     expect = expectation(protect_level, st)
+    #     plt.scatter(expect, win_rate[int(expect)])
+    # plt.xlabel('强化次数')
+    # plt.ylabel('成功率')
+    # plt.legend()
+    # plt.show()

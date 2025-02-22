@@ -25,5 +25,3 @@ class Setting:
 
     def enhance_success_rate(self, enhance_level: int):
         return BASE_SUCCESS_RATE[enhance_level] * self.enhance_rate_mod
-
-
