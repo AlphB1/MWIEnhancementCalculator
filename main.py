@@ -1,6 +1,5 @@
 import numpy as np
 from matplotlib import pyplot as plt
-
 from settings import *
 
 np.set_printoptions(linewidth=1000, precision=5, suppress=True)
@@ -40,6 +39,10 @@ def expectation(protect_level: int, st: Setting):
     return np.linalg.solve(coefficient, np.ones(st.target_level + 1))[0]
 
 
+def protect_expectation(protect_level: int, st: Setting):
+    pass
+
+
 def stochastic_matrix(protect_level: int, st: Setting):
     """
     result[i][j] = when you have a +i item, result[i][j] possibility to get a +j item after one action
@@ -64,7 +67,7 @@ def stochastic_matrix(protect_level: int, st: Setting):
     return result
 
 
-def get_distribution(protect_level: int, protect_times: int, enhance_times: int, st: Setting, tolerance=1e-6):
+def get_distribution(protect_level: int, protect_times: int, enhance_times: int, st: Setting, tolerance=1e-8):
     """
     Let distribution = protection_level × (protect_times+1) matrix
     After k actions, distribution[i][j] = possibility of owning +i item and having used j protection
@@ -106,37 +109,36 @@ def get_distribution(protect_level: int, protect_times: int, enhance_times: int,
     return distribution, accomplish_rate
 
 
-def fixed_total_cost():
-    pass
-
-
 def fixed_accomplish_rate(matrix, protect_cost, alpha=0.95):
     from bisect import bisect_left
     if matrix[-1][-1] < alpha:
         return None
     n, m = matrix.shape
-    return min([(i, tmp if (tmp := bisect_left(matrix[i], alpha)) < m else np.inf) for i in range(n)],
+    return min(((i, tmp if (tmp := bisect_left(matrix[i], alpha)) < m else np.inf) for i in range(n)),
                key=lambda x: (x[0] + protect_cost * x[1]))
 
 
 if __name__ == '__main__':
     st = Setting()
-    pl = 7
-    pt = 300
-    et = 50000
+    pl = 8
+    pt = 50
+    et = 30000
     accomplish_rate = get_distribution(pl, pt, et, st)[1]
-    print(accomplish_rate)
+    best_ratio = fixed_accomplish_rate(accomplish_rate, 1200)
     fig = plt.figure()
     ax = fig.add_subplot(111, projection='3d')
-    surf = ax.plot_surface(np.tile(np.arange(et + 1), (pt + 1, 1)).T,
-                           np.tile(np.arange(pt + 1), (et + 1, 1)),
-                           accomplish_rate, cmap='viridis')
+    ax.view_init(elev=30, azim=-120, roll=0)
+    ax.set_xlim(0, et)
+    ax.set_ylim(0, pt)
+    ax.set_zlim(0.0, 1.0)
+    ax.plot_surface(np.tile(np.arange(et + 1), (pt + 1, 1)).T,
+                    np.tile(np.arange(pt + 1), (et + 1, 1)),
+                    accomplish_rate, cmap='viridis',zorder=0)
     ax.set_xlabel('强化次数')
     ax.set_ylabel('准备垫子数量')
     ax.set_zlabel('出货概率')
-    best_ratio = fixed_accomplish_rate(accomplish_rate, 200)
+    ax.scatter(best_ratio[0], best_ratio[1], accomplish_rate[best_ratio[0]][best_ratio[1]], color='red')
     print(best_ratio)
-    print(accomplish_rate[best_ratio])
     plt.show()
     # plt.figure(figsize=(8, 4.5), dpi=100)
     #
