@@ -1,5 +1,3 @@
-from decimal import Decimal as D
-
 BASE_SUCCESS_RATE = [0.5, 0.45, 0.45, 0.4, 0.4,
                      0.4, 0.35, 0.35, 0.35, 0.35,
                      0.3, 0.3, 0.3, 0.3, 0.3,

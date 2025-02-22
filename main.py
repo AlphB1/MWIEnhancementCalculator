@@ -64,7 +64,7 @@ def stochastic_matrix(protect_level: int, st: Setting):
     return result
 
 
-def get_distribution(protect_level: int, protect_times: int, st: Setting,tolerance = 1e-6):
+def get_distribution(protect_level: int, protect_times: int, st: Setting, tolerance=1e-6):
     """
     Let distribution = protection_level × (protect_times+1) matrix
     After k actions, distribution[i][j] = possibility of owning +i item and having used j protection
@@ -92,23 +92,22 @@ def get_distribution(protect_level: int, protect_times: int, st: Setting,toleran
             protect_vector[now_level - protect_level] = 1 - success_rate
     distribution = np.zeros((protect_times + 1, st.target_level + 1))
     distribution[0][0] = 1.0
-    print(distribution)
     for _ in range(st.enhance_times):
         next = np.vstack((distribution[:-1, ] @ no_protect_matrix, distribution[-1]))
         protect_slice = distribution[:-1, protect_level:st.target_level]
         fail_matrix = protect_slice * protect_vector
         next[1:, protect_level - 1:st.target_level - 1] += fail_matrix
         distribution = next
-        assert abs(1 - np.sum(distribution)) < tolerance
+    assert abs(1 - np.sum(distribution)) < tolerance
     return distribution
 
 
 if __name__ == '__main__':
     st = Setting()
-    dis = get_distribution(7, 16, st)
-    print('probability of accomplishing target =',np.sum(dis[:, -1]))
-    print('probability of consuming all enhancing material =',np.sum(dis[:-1,:-1]))
-    print('probability of consuming all protect material =',np.sum(dis[-1,:]))
+    dis = get_distribution(7, 100, st)
+    print('probability of accomplishing target =', np.sum(dis[:, -1]))
+    print('probability of consuming all enhancing material =', np.sum(dis[:-1, :-1]))
+    print('probability of consuming all protect material =', np.sum(dis[-1, :]))
 
     # plt.figure(figsize=(8, 4.5), dpi=100)
     #
