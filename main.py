@@ -94,16 +94,29 @@ def get_distribution(protect_level: int, protect_times: int, enhance_times: int,
     distribution = np.zeros((protect_times + 1, st.target_level + 1))
     distribution[0][0] = 1.0
     for i in range(1, enhance_times + 1):
-        # if i % 100 == 0:
-        #     print(i)
+        if i % 100 == 0:
+            print(i)
         next = np.vstack((distribution[:-1, ] @ no_protect_matrix, distribution[-1]))
         protect_slice = distribution[:-1, protect_level:st.target_level]
         next[1:, protect_level - 1:st.target_level - 1] += protect_slice * protect_vector
         distribution = next
         for j in range(1, protect_times + 1):
-            accomplish_rate[i][j] = accomplish_rate[i][j - 1] + distribution[j][-1]
+            accomplish_rate[i][j] = accomplish_rate[i][j - 1] + distribution[j - 1][-1]
     assert abs(1 - np.sum(distribution)) < tolerance
     return distribution, accomplish_rate
+
+
+def fixed_total_cost():
+    pass
+
+
+def fixed_accomplish_rate(matrix, protect_cost, alpha=0.95):
+    from bisect import bisect_left
+    if matrix[-1][-1] < alpha:
+        return None
+    n, m = matrix.shape
+    return min([(i, tmp if (tmp := bisect_left(matrix[i], alpha)) < m else np.inf) for i in range(n)],
+               key=lambda x: (x[0] + protect_cost * x[1]))
 
 
 if __name__ == '__main__':
@@ -119,10 +132,12 @@ if __name__ == '__main__':
                            np.tile(np.arange(pt + 1), (et + 1, 1)),
                            accomplish_rate, cmap='viridis')
     ax.set_xlabel('强化次数')
-    ax.set_ylabel('垫子数量')
+    ax.set_ylabel('准备垫子数量')
     ax.set_zlabel('出货概率')
+    best_ratio = fixed_accomplish_rate(accomplish_rate, 200)
+    print(best_ratio)
+    print(accomplish_rate[best_ratio])
     plt.show()
-
     # plt.figure(figsize=(8, 4.5), dpi=100)
     #
     # start = np.zeros(st.target_level + 1)
