@@ -64,14 +64,15 @@ def stochastic_matrix(protect_level: int, st: Setting):
     return result
 
 
-def get_distribution(protect_level: int, protect_times: int, st: Setting, tolerance=1e-6):
+def get_distribution(protect_level: int, protect_times: int, enhance_times: int, st: Setting, tolerance=1e-6):
     """
     Let distribution = protection_level × (protect_times+1) matrix
     After k actions, distribution[i][j] = possibility of owning +i item and having used j protection
     """
     if protect_times == np.inf:
-        return np.linalg.matrix_power(stochastic_matrix(protect_level, st), st.enhance_times)[0][st.target_level]
+        return np.linalg.matrix_power(stochastic_matrix(protect_level, st), enhance_times)[0][st.target_level]
     assert 2 <= protect_level <= st.target_level
+    accomplish_rate = np.zeros((enhance_times + 1, protect_times + 1))
     no_protect_matrix = np.zeros((st.target_level + 1, st.target_level + 1))
     protect_vector = np.zeros(st.target_level - protect_level)
     for now_level in range(st.target_level + 1):
@@ -92,22 +93,35 @@ def get_distribution(protect_level: int, protect_times: int, st: Setting, tolera
             protect_vector[now_level - protect_level] = 1 - success_rate
     distribution = np.zeros((protect_times + 1, st.target_level + 1))
     distribution[0][0] = 1.0
-    for _ in range(st.enhance_times):
+    for i in range(1, enhance_times + 1):
+        # if i % 100 == 0:
+        #     print(i)
         next = np.vstack((distribution[:-1, ] @ no_protect_matrix, distribution[-1]))
         protect_slice = distribution[:-1, protect_level:st.target_level]
-        fail_matrix = protect_slice * protect_vector
-        next[1:, protect_level - 1:st.target_level - 1] += fail_matrix
+        next[1:, protect_level - 1:st.target_level - 1] += protect_slice * protect_vector
         distribution = next
+        for j in range(1, protect_times + 1):
+            accomplish_rate[i][j] = accomplish_rate[i][j - 1] + distribution[j][-1]
     assert abs(1 - np.sum(distribution)) < tolerance
-    return distribution
+    return distribution, accomplish_rate
 
 
 if __name__ == '__main__':
     st = Setting()
-    dis = get_distribution(7, 100, st)
-    print('probability of accomplishing target =', np.sum(dis[:, -1]))
-    print('probability of consuming all enhancing material =', np.sum(dis[:-1, :-1]))
-    print('probability of consuming all protect material =', np.sum(dis[-1, :]))
+    pl = 7
+    pt = 300
+    et = 50000
+    accomplish_rate = get_distribution(pl, pt, et, st)[1]
+    print(accomplish_rate)
+    fig = plt.figure()
+    ax = fig.add_subplot(111, projection='3d')
+    surf = ax.plot_surface(np.tile(np.arange(et + 1), (pt + 1, 1)).T,
+                           np.tile(np.arange(pt + 1), (et + 1, 1)),
+                           accomplish_rate, cmap='viridis')
+    ax.set_xlabel('强化次数')
+    ax.set_ylabel('垫子数量')
+    ax.set_zlabel('出货概率')
+    plt.show()
 
     # plt.figure(figsize=(8, 4.5), dpi=100)
     #

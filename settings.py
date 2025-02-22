@@ -21,7 +21,6 @@ class Setting:
         self.blessed_rate = 0.01 * drink_concentration if j["tea"]['blessed tea'] else 0.0
         self.enhance_rate_mod = 1 + level_rate + 0.0005 * j["laboratory_level"] + enhancer_buff
         self.target_level = j["target_level"]
-        self.enhance_times = j["enhance_times"]
 
     def enhance_success_rate(self, enhance_level: int):
         return BASE_SUCCESS_RATE[enhance_level] * self.enhance_rate_mod

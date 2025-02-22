@@ -11,7 +11,6 @@
     "ultra enhancing tea": true,
     "blessed tea": true
   },
-  "recommended_level": 95,
-  "target_level": 12,
-  "enhance_times": 15000
+  "recommended_level": 70,
+  "target_level": 12
 }
